@@ -32,7 +32,7 @@ def train():
         train_op = model.train(loss, global_step=global_step)
 
         init = tf.global_variables_initializer() 
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(max_to_keep = 100000)
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
             writer = tf.summary.FileWriter(FLAGS.summary_dir, sess.graph)
@@ -43,13 +43,12 @@ def train():
                 _, cur_loss, summary = sess.run([train_op, loss, summary_op],
                                                 feed_dict={x_: batch[0], y: batch[1], keep_prob: 0.5})
                 writer.add_summary(summary, i)
-                if i % 1000 == 0:
-                    print('Iter {} Loss: {}'.format(i, cur_loss))
-                    validation_accuracy = accuracy.eval(feed_dict={x_: mnist.test.images, y: mnist.test.labels, keep_prob: 1.0}) #evaluate test set
-                    print('Test_Accuracy: {}'.format(validation_accuracy))
-
-                if i == FLAGS.num_iter - 1:
-                    saver.save(sess, FLAGS.checkpoint_file_path, global_step)
+                if i % 10000 == 0:
+                    f = open('trainingStdDrop.log', 'a+')
+                    validation_accuracy = accuracy.eval(feed_dict={x_: mnist.test.images, y: mnist.test.labels, keep_prob: 1.0}) 
+                    f.write('{}, {}, {} \n'.format(i, cur_loss, validation_accuracy))
+                    f.close()
+                    saver.save(sess, FLAGS.checkpoint_file_path+"-"+str(i))
 
 def main(argv=None):
     train()
@@ -58,7 +57,7 @@ def main(argv=None):
 if __name__ == '__main__':
     tf.app.flags.DEFINE_integer('batch_size', 64, 'size of training batches')
     tf.app.flags.DEFINE_integer('num_iter', 10000000, 'number of training iterations')
-    tf.app.flags.DEFINE_string('checkpoint_file_path', 'checkpoints/model.ckpt-10000', 'path to checkpoint file')
+    tf.app.flags.DEFINE_string('checkpoint_file_path', 'checkpoints/model.ckpt', 'path to checkpoint file')
     tf.app.flags.DEFINE_string('summary_dir', 'graphs', 'path to directory for storing summaries')
 
     tf.app.run()

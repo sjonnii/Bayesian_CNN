@@ -49,25 +49,24 @@ class Model(object):
 
     def train(self, loss, global_step):
         #should probably make these variables arguements but cba
-        decay_step = 1
-        decay_rate = 0.0001 #decay rate
         #learning_rate = tf.train.inverse_time_decay(self._learning_rate, global_step, decay_step, decay_rate)
-        learning_rate = td.poly_inverse_time_decay(self._learning_rate, global_step, decay_steps = 1, decay_rate =  decay_rate, power = 0.75)
+        learning_rate = td.poly_inverse_time_decay(self._learning_rate, global_step, decay_steps = 1, decay_rate = 0.0001, power = 0.75)
         #optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-        print ('it changed')
-        optimizer = tf.train.MomentumOptimizer(learning_rate, momentum = 0.9 , use_nesterov=True)
+        optimizer = tf.train.MomentumOptimizer(learning_rate, momentum = 0.9, use_nesterov=True)
         train_op = optimizer.minimize(
             loss=loss,
-            global_step=tf.train.get_global_step())
+            global_step=global_step)
         return train_op
 
     def loss(self, logits, labels):
         with tf.variable_scope('loss') as scope:
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels)
-            cost = tf.reduce_mean(cross_entropy, name=scope.name) #computes the mean loss = cost. Minimizing mean loss.
-            tf.summary.scalar('cost', cost)
+            cross_entropy_mean = tf.reduce_mean(cross_entropy, name=scope.name) #computes the mean loss = cost. Minimizing mean loss.
+            tf.add_to_collection('losses', cross_entropy_mean)
 
-        return cost
+            tf.summary.scalar('cost', tf.add_n(tf.get_collection('losses')))
+
+        return tf.add_n(tf.get_collection('losses'), name='total_loss')
 
     def accuracy(self, logits, y):
         with tf.variable_scope('accuracy') as scope:
@@ -89,7 +88,10 @@ class Model(object):
                               padding='SAME') # padding set so the output feature maps are the same size as the input feature maps.
 
     def _create_weights(self, shape):
-        return tf.Variable(tf.truncated_normal(shape=shape, stddev=0.1, dtype=tf.float32))
+        var =  tf.Variable(tf.truncated_normal(shape=shape, stddev=0.1, dtype=tf.float32))
+        weight_decay = tf.multiply(tf.nn.l2_loss(var), 0.0005, name='weight_loss')
+        tf.add_to_collection('losses', weight_decay)
+        return var
 
     def _create_bias(self, shape):
         return tf.Variable(tf.constant(1., shape=shape, dtype=tf.float32))
